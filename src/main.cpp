@@ -4,24 +4,55 @@
 #include <Wire.h>
 #include <MCUFRIEND_kbv.h>
 #include <Adafruit_GFX.h>
-
-MCUFRIEND_kbv tft;
+#include <WiFi.h>
+#include <Fonts/FreeSans9pt7b.h>
+#include <Fonts/FreeSans12pt7b.h>
+#include <Fonts/FreeSerif12pt7b.h>
+#include <FreeDefaultFonts.h>
 
 #if defined(ESP32)
-#define SD_CS     5
+    #define SD_CS   5
+    #define LCD_RD  2 
+    #define LCD_WR  4
+    #define LCD_RS 15
+    #define LCD_CS 33
+    #define LCD_RST 32
+    #define LCD_D0 12
+    #define LCD_D1 13
+    #define LCD_D2 26
+    #define LCD_D3 25
+    #define LCD_D4 17
+    #define LCD_D5 16
+    #define LCD_D6 27
+    #define LCD_D7 14
 #else
-#define SD_CS     10
+    #define SD_CS     10
 #endif
+
+#define BLACK   0x0000
+#define RED     0xF800
+#define GREEN   0x07E0
+#define WHITE   0xFFFF
+#define GREY    0x8410
 #define NAMEMATCH ""
 #define PALETTEDEPTH 0
-
-char namebuf[32] = "/";
-File root;
-int pathlen;
+#define BMPIMAGEOFFSET 54
+#define BUFFPIXEL      20
 
 uint16_t read16(File& f);
 uint32_t read32(File& f);
 uint8_t showBMP(char *nm, int x, int y);
+void showmsgXY(int x, int y, int sz, const GFXfont *f, const char *msg, uint16_t color);
+void cleanScr();
+void printTextAt(char *text, int numberLine);
+void wifiScan();
+
+MCUFRIEND_kbv tft;
+char namebuf[32] = "/";
+File root;
+int pathlen;
+int lineCounter = 0;
+int lineHeight = 25;
 
 void setup() {
     uint16_t ID;
@@ -40,6 +71,8 @@ void setup() {
     }
     root = SD.open(namebuf);
     pathlen = strlen(namebuf);
+
+    wifiScan();
 }
 
 void loop() {
@@ -65,7 +98,6 @@ void loop() {
                 case 0:
                     Serial.print(millis() - start);
                     Serial.println(F("ms"));
-                    delay(5000);
                     break;
                 case 1:
                     Serial.println(F("bad position"));
@@ -89,11 +121,57 @@ void loop() {
         }
     }
     else root.rewindDirectory();
+
+    delay(1000);
+    cleanScr();
+    for(int i = 1; i <= 12; i++) {
+        lineCounter = i;
+        char buffer1[4];
+        char buffer2[20] = "Line counter: ";
+        itoa(lineCounter, buffer1, 10);
+        strcat(buffer2, buffer1);
+        printTextAt(buffer2, lineCounter);
+        delay(100);
+    }
+    delay(2000);
 }
 
-#define BMPIMAGEOFFSET 54
+void wifiScan() {
+    // WiFi.scanNetworks will return the number of networks found
+    int n = WiFi.scanNetworks();
+    Serial.println("scan done");
+    if (n == 0) {
+        Serial.println("no networks found");
+    } else {
+        Serial.print(n);
+        Serial.println(" networks found");
+        for (int i = 0; i < n; ++i) {
+            // Print SSID and RSSI for each network found
+            Serial.print(i + 1);
+            Serial.print(": ");
+            Serial.print(WiFi.SSID(i));
+            Serial.print(" (");
+            Serial.print(WiFi.RSSI(i));
+            Serial.print(")");
+            Serial.println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN)?" ":"*");
+            delay(10);
+        }
+    }
+    
+    Serial.println("");
+    WiFi.begin("AiXKare-4G", "1164Louder!#");
 
-#define BUFFPIXEL      20
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.println("Connecting to WiFi..");
+    }
+
+    if(WiFi.isConnected()) {
+        Serial.println(">>>>>>>>>>>>>>>>>>>>>>WiFi Connected!!!!!<<<<<<<<<<<<<<<<<<<<<<<<<<");
+    } else {
+        Serial.println("WiFi Not connected XC");
+    }
+}
 
 uint16_t read16(File& f) {
     uint16_t result;         // read little-endian
@@ -105,6 +183,29 @@ uint32_t read32(File& f) {
     uint32_t result;
     f.read((uint8_t*)&result, sizeof(result));
     return result;
+}
+
+void logDebug(char text) {
+    Serial.print(text);
+}
+
+void cleanScr() {
+    tft.fillScreen(BLACK);
+}
+
+void printTextAt(char *text, int numberLine) {
+    showmsgXY(5, numberLine*lineHeight, 1, &FreeSans12pt7b, text, WHITE);
+}
+
+void showmsgXY(int x, int y, int sz, const GFXfont *f, const char *msg, uint16_t color)
+{
+    int16_t x1, y1;
+    uint16_t wid, ht;
+    tft.setFont(f);
+    tft.setCursor(x, y);
+    tft.setTextColor(color);
+    tft.setTextSize(sz);
+    tft.print(msg);
 }
 
 uint8_t showBMP(char *nm, int x, int y)
@@ -120,8 +221,7 @@ uint8_t showBMP(char *nm, int x, int y)
     boolean flip = true;        // BMP is stored bottom-to-top
     int w, h, row, col, lcdbufsiz = (1 << PALETTEDEPTH) + BUFFPIXEL, buffidx;
     uint32_t pos;               // seek position
-    boolean is565 = false;      //
-
+    boolean is565 = false;
     uint16_t bmpID;
     uint16_t n;                 // blocks read
     uint8_t ret;
@@ -180,12 +280,6 @@ uint8_t showBMP(char *nm, int x, int y)
         // Set TFT address window to clipped image bounds
         tft.setAddrWindow(x, y, x + w - 1, y + h - 1);
         for (row = 0; row < h; row++) { // For each scanline...
-            // Seek to start of scan line.  It might seem labor-
-            // intensive to be doing this on every line, but this
-            // method covers a lot of gritty details like cropping
-            // and scanline padding.  Also, the seek only takes
-            // place if the file position actually needs to change
-            // (avoids a lot of cluster math in SD library).
             uint8_t r, g, b, *sdptr;
             int lcdidx, lcdleft;
             if (flip)   // Bitmap is stored bottom-to-top order (normal BMP)
@@ -249,4 +343,3 @@ uint8_t showBMP(char *nm, int x, int y)
     bmpFile.close();
     return (ret);
 }
-
