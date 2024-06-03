@@ -76,10 +76,12 @@ void setupSD(void) {
 void setupScreen(void) {
     LOG_S(DEBUG, __FILE__, __LINE__, "setupScreen()...");
     uint16_t ID;
-    LOG_S(INFO, __FILE__, __LINE__, "TFT Setup, LCD ID:0x");
+    char tempBuffer[50];
     ID = tft.readID();
-    Serial.println(ID, HEX);
     if (ID == 0x0D3D3) ID = 0x9481;
+    sprintf(tempBuffer, "TFT Setup, LCD ID:0x%x", ID);
+    LOG_S(INFO, __FILE__, __LINE__, tempBuffer);
+
     tft.begin(ID);
     tft.fillScreen(0x0000);
     tft.setTextColor(0xFFFF, 0x0000);
