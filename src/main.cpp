@@ -12,7 +12,7 @@ bool disconnectIssued = false;
 int counterLoops = 0;
 #define connectWiFi true
 #define sendSyncReqs true
-#define readCredentials false
+#define readCredentials true
 
 void setup() {
     setupLog();    

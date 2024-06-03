@@ -110,7 +110,7 @@ void setupCred(void) {
         LOG_D(INFO, __FILE__, __LINE__, "Failed to open credentials file");
         return;
     }
-    String line = rootCred.readStringUntil('\n');
+    String line = rootCred.readStringUntil(0x0d);
     int commaIndex = line.indexOf(',');
     String str1 = line.substring(0, commaIndex);
     String str2 = line.substring(commaIndex + 1);
