@@ -76,7 +76,7 @@ void setupSD(void) {
 void setupScreen(void) {
     LOG_S(DEBUG, __FILE__, __LINE__, "setupScreen()...");
     uint16_t ID;
-    Serial.print("Show BMP files on TFT with ID:0x");
+    LOG_S(INFO, __FILE__, __LINE__, "TFT Setup, LCD ID:0x");
     ID = tft.readID();
     Serial.println(ID, HEX);
     if (ID == 0x0D3D3) ID = 0x9481;
