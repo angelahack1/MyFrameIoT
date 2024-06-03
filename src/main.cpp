@@ -38,7 +38,10 @@ void loop() {
 
     if((counterLoops % 2) == 0) {
         if(sendSyncReqs && connectWiFi) {
+            LOG_D(INFO, __FILE__, __LINE__, "About 2 send sync...");
             sendSync();
+            LOG_D(INFO, __FILE__, __LINE__, "...Sync sent!");
+            delay(2000);
         }
     }
 
