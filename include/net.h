@@ -26,11 +26,13 @@ String sendJson(DynamicJsonDocument &pDoc) {
       LOG_S(INFO, __FILE__, __LINE__, outputBuffer);
       sprintf(outputBuffer, "Response code: %d", httpResponseCode);
       LOG_S(INFO, __FILE__, __LINE__, outputBuffer);
+      LOG_D(INFO, __FILE__, __LINE__, outputBuffer);
       return response;
     } else {
       char outputBuffer[50];
       sprintf(outputBuffer, "Error sending POST: %d", httpResponseCode);
       LOG_S(INFO, __FILE__, __LINE__, outputBuffer);
+      LOG_D(INFO, __FILE__, __LINE__, outputBuffer);
       return String("error: ") + String(outputBuffer);
     }
     http.end();
