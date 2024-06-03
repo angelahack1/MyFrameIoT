@@ -8,18 +8,23 @@
 #define device_id "0000000000000001"
 #define MAXRETRYS 10
 
+bool sentOk = false;
 
 String sendJson(DynamicJsonDocument &pDoc) {
     LOG_D(DEBUG, __FILE__, __LINE__, "setupNet()...");
     HTTPClient http;
     String response, json;
     int counterRetrys = 0;
+    sentOk = false;
     
     http.begin(ADDRESS);
     http.addHeader("Content-Type", "application/json ");
     serializeJson(pDoc, json);
     
     int httpResponseCode = http.POST(json);
+
+    if(httpResponseCode > 0)
+      sentOk = true;
 
     while(httpResponseCode < 0) {
       http.end();
@@ -40,6 +45,7 @@ String sendJson(DynamicJsonDocument &pDoc) {
     if( (httpResponseCode > 0) && (counterRetrys < MAXRETRYS) && (counterRetrys > 0) ) {
         char tempBuffer[50];
         sprintf(tempBuffer, "Retry (%d) success!", counterRetrys);
+        sentOk = true;
         LOG_D(INFO, __FILE__, __LINE__, tempBuffer);
         LOG_S(INFO, __FILE__, __LINE__, tempBuffer);
     }
