@@ -30,7 +30,7 @@ String sendJson(DynamicJsonDocument &pDoc) {
       return response;
     } else {
       char outputBuffer[50];
-      sprintf(outputBuffer, "Error sending POST: %d", httpResponseCode);
+      sprintf(outputBuffer, "Error Tx POST: %d", httpResponseCode);
       LOG_S(INFO, __FILE__, __LINE__, outputBuffer);
       LOG_D(INFO, __FILE__, __LINE__, outputBuffer);
       return String("error: ") + String(outputBuffer);
