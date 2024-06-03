@@ -24,20 +24,23 @@
 #define BUFFPIXEL      20
 
 #if defined(ESP32)
-    #define SD_CS   5
-    #define LCD_RD  2 
-    #define LCD_WR  4
-    #define LCD_RS 15
-    #define LCD_CS 33
-    #define LCD_RST 32
-    #define LCD_D0 12
-    #define LCD_D1 13
-    #define LCD_D2 26
-    #define LCD_D3 25
-    #define LCD_D4 17
-    #define LCD_D5 16
-    #define LCD_D6 27
-    #define LCD_D7 14
+    #define SD_CS   5   //8-R-D-U
+    #define SD_SCK  18  //9-R-D-U
+    #define SD_DI   23  //1-R-U-D
+    #define SD_DO   19  //6-R-U-D
+    #define LCD_RD  2   //4-R-D-U
+    #define LCD_WR  4   //5-R-D-U
+    #define LCD_RS 15   //3-R-D-U
+    #define LCD_CS 33   //7-L-U-D
+    #define LCD_RST 32  //6-L-U-D
+    #define LCD_D0 12   //4-L-D-U
+    #define LCD_D1 13   //3-L-D-U
+    #define LCD_D2 26   //7-L-D-U
+    #define LCD_D3 25   //8-L-D-U
+    #define LCD_D4 17   //7-R-D-U
+    #define LCD_D5 16   //6-R-D-U
+    #define LCD_D6 27   //6-L-D-U
+    #define LCD_D7 14   //5-L-D-U
 #else
     #define SD_CS     10
 #endif
