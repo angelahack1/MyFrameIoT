@@ -1,82 +1,56 @@
 #ifndef NET_H
 #define NET_H
-#include <ArduinoJson.h>
-#include <HTTPClient.h>
+
+#include <WiFi.h>
 #include "log.h"
 
-#define ADDRESS "http://192.168.1.14/api"
+#define NET_HOST "192.168.1.14"
+#define NET_PORT 80
+#define NET_PATH "/api"
 #define device_id "0000000000000001"
 #define MAXRETRYS 10
 
-bool sentOk = false;
+static bool sendSyncPayload(void) {
+    static const char payload[] = "{\"device_id\":\"" device_id "\",\"msg\":\"sync\"}";
+    WiFiClient client;
+    char statusLine[32] = "\0";
 
-String sendJson(DynamicJsonDocument &pDoc) {
-    LOG_D(DEBUG, __FILE__, __LINE__, "setupNet()...");
-    HTTPClient http;
-    String response, json;
-    int counterRetrys = 0;
-    sentOk = false;
-    
-    http.begin(ADDRESS);
-    http.addHeader("Content-Type", "application/json ");
-    serializeJson(pDoc, json);
-    
-    int httpResponseCode = http.POST(json);
-
-    if(httpResponseCode > 0)
-      sentOk = true;
-
-    while(httpResponseCode < 0) {
-      http.end();
-      delay(500);
-      LOG_D(WARN, __FILE__, __LINE__, "Retrying...");
-      LOG_S(WARN, __FILE__, __LINE__, "Retrying...");
-      http.begin(ADDRESS);
-      http.addHeader("Content-Type", "application/json ");
-      httpResponseCode = http.POST(json);
-      if(counterRetrys >= MAXRETRYS) {
-        LOG_D(WARN, __FILE__, __LINE__, "Reytrys stopped XC.");
-        LOG_S(WARN, __FILE__, __LINE__, "Reytrys stopped XC.");
-        break;
-      }
-      counterRetrys++;
+    if (!client.connect(NET_HOST, NET_PORT)) {
+        return false;
     }
 
-    if( (httpResponseCode > 0) && (counterRetrys < MAXRETRYS) && (counterRetrys > 0) ) {
-        char tempBuffer[50];
-        sprintf(tempBuffer, "Retry (%d) success!", counterRetrys);
-        sentOk = true;
-        LOG_D(INFO, __FILE__, __LINE__, tempBuffer);
-        LOG_S(INFO, __FILE__, __LINE__, tempBuffer);
+    client.print(F("POST " NET_PATH " HTTP/1.1\r\n"
+                   "Host: " NET_HOST "\r\n"
+                   "Content-Type: application/json\r\n"
+                   "Connection: close\r\n"
+                   "Content-Length: "));
+    client.print(sizeof(payload) - 1);
+    client.print(F("\r\n\r\n"));
+    client.write(reinterpret_cast<const uint8_t *>(payload), sizeof(payload) - 1);
+    client.setTimeout(1500);
+
+    size_t len = client.readBytesUntil('\n', statusLine, sizeof(statusLine) - 1);
+    statusLine[len] = '\0';
+    client.stop();
+
+    if (len < 10) {
+        return false;
     }
 
-    if (httpResponseCode > 0) {
-      response = http.getString();
-      char outputBuffer[50];
-      sprintf(outputBuffer, "Response: %s", response.c_str());
-      LOG_S(INFO, __FILE__, __LINE__, outputBuffer);
-      sprintf(outputBuffer, "Response code: %d", httpResponseCode);
-      LOG_S(INFO, __FILE__, __LINE__, outputBuffer);
-      LOG_D(INFO, __FILE__, __LINE__, outputBuffer);
-      return response;
-    } else {
-      char outputBuffer[50];
-      sprintf(outputBuffer, "Error Tx POST: %d", httpResponseCode);
-      LOG_S(INFO, __FILE__, __LINE__, outputBuffer);
-      LOG_S(INFO, __FILE__, __LINE__, (char*)http.errorToString(httpResponseCode).c_str());
-      LOG_D(INFO, __FILE__, __LINE__, outputBuffer);
-      return String("error: ") + String(outputBuffer);
-    }
-    http.end();
-    LOG_D(DEBUG, __FILE__, __LINE__, "...setupNet()");
+    return statusLine[9] == '2';
 }
 
-void sendSync(void) {
+bool sendSync(void) {
     LOG_D(DEBUG, __FILE__, __LINE__, "sendSync()...");
-    DynamicJsonDocument doc(256);
-    doc["device_id"] = device_id;
-    doc["msg"] = "sync";
-    String response = sendJson(doc);
+    for (uint8_t counterRetrys = 0; counterRetrys < MAXRETRYS; ++counterRetrys) {
+        if (sendSyncPayload()) {
+            LOG_D(DEBUG, __FILE__, __LINE__, "...sendSync()");
+            return true;
+        }
+        delay(500);
+    }
     LOG_D(DEBUG, __FILE__, __LINE__, "...sendSync()");
+    return false;
 }
+
 #endif

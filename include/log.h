@@ -3,10 +3,11 @@
 #define LOG_H
 
 #include <Arduino.h>
+#include "build_config.h"
 
-bool _debug = false;
+static constexpr bool _debug = false;
 
-typedef enum {
+typedef enum : uint8_t {
     DEBUG,
     INFO,
     WARN,
@@ -14,42 +15,52 @@ typedef enum {
     FATAL
 } level;
 
+#if MF_ENABLE_SERIAL_LOG
+
 void setupLog(void) {
     Serial.begin(9600);
 }
 
-void LOG_S(level lvl, char *stringFrom, int lineNumber, char *text) {
+void LOG_S(level lvl, const char *stringFrom, int lineNumber, const char *text) {
     if( (!_debug) && (lvl == DEBUG) )
         return;
-    char outputBuffer[150] = "\0";
-    char tempBuffer[10] = "\0";
-
     switch(lvl) {
         case DEBUG:
-            strcat(outputBuffer, "[DEBUG] ");
+            Serial.print(F("[DEBUG] "));
         break;
         case INFO:
-            strcat(outputBuffer, "[INFO] ");
+            Serial.print(F("[INFO] "));
         break;
         case WARN:
-            strcat(outputBuffer, "[WARNING] ");
+            Serial.print(F("[WARNING] "));
         break;
         case ERROR:
-            strcat(outputBuffer, "[ERROR] ");
+            Serial.print(F("[ERROR] "));
         break;
         case FATAL:
-            strcat(outputBuffer, "[FATAL] ");
+            Serial.print(F("[FATAL] "));
         break;
         default:
-            strcat(outputBuffer, "[ ] ");
+            Serial.print(F("[ ] "));
     }
-    strcat(outputBuffer, stringFrom);
-    strcat(outputBuffer, "(");
-    itoa(lineNumber, tempBuffer, 10);
-    strcat(outputBuffer, tempBuffer);
-    strcat(outputBuffer, "): ");
-    strcat(outputBuffer, text);
-    Serial.println(outputBuffer);
+    Serial.print(stringFrom);
+    Serial.print('(');
+    Serial.print(lineNumber);
+    Serial.print(F("): "));
+    Serial.println(text);
 }
+
+#else
+
+inline void setupLog(void) {}
+#define LOG_S(...) ((void)0)
+
+#endif
+
+#if MF_ENABLE_SCREEN_LOG
+void LOG_D(level lvl, const char *stringFrom, int lineNumber, const char *text);
+#else
+#define LOG_D(...) ((void)0)
+#endif
 
 #endif

@@ -7,10 +7,10 @@
 #include <Wire.h>
 #include <MCUFRIEND_kbv.h>
 #include <Adafruit_GFX.h>
+#include "build_config.h"
+#if MF_ENABLE_SCREEN_LOG
 #include <Fonts/FreeSans9pt7b.h>
-#include <Fonts/FreeSans12pt7b.h>
-#include <Fonts/FreeSerif12pt7b.h>
-#include <FreeDefaultFonts.h>
+#endif
 #include "log.h"
 
 #define BLACK   0x0000
@@ -49,20 +49,25 @@
 #define MAXHEIGHT 18
 
 MCUFRIEND_kbv tft;
-int lineCounter = 0;
-int maxLines = MAXLINES;
-char textScreen[MAXLINES+1][30];
 char namebuf[32] = "/reel";
 File root;
 int pathlen;
+
+#if MF_ENABLE_SCREEN_LOG
+int lineCounter = 0;
+int maxLines = MAXLINES;
+char textScreen[MAXLINES+1][30];
 bool showPrepared = false;
+#endif
 
 uint16_t read16(File& f);
 uint32_t read32(File& f);
 uint8_t showBMP(char *nm, int x, int y);
+#if MF_ENABLE_SCREEN_LOG
 void showPrepare(int sz, const GFXfont *f, uint16_t color);
 void showmsgXYPrepared(int x, int y, const char *msg);
 void showmsgXY(int x, int y, int sz, const GFXfont *f, const char *msg, uint16_t color);
+#endif
 
 void setupSD(void) {
     LOG_S(DEBUG, __FILE__, __LINE__, "setupSD()...");
@@ -94,10 +99,15 @@ void setupScreen(void) {
 void cleanScr() {
     LOG_S(DEBUG, __FILE__, __LINE__, "cleanScr()...");
     tft.fillScreen(BLACK);
+
+#if MF_ENABLE_SCREEN_LOG
     lineCounter = 0;
+#endif
+
     LOG_S(DEBUG, __FILE__, __LINE__, "...cleanScr()");
 }
 
+#if MF_ENABLE_SCREEN_LOG
 void printText(char *text) {
     LOG_S(DEBUG, __FILE__, __LINE__, "printText()...");
     char textBuffer[MAXWIDTH+1];
@@ -137,8 +147,6 @@ void printText(char *text) {
 void showmsgXY(int x, int y, int sz, const GFXfont *f, const char *msg, uint16_t color)
 {
     LOG_S(DEBUG, __FILE__, __LINE__, "showmsgXY()...");
-    int16_t x1, y1;
-    uint16_t wid, ht;
     tft.setFont(f);
     tft.setCursor(x, y);
     tft.setTextColor(color);
@@ -160,11 +168,10 @@ void showmsgXYPrepared(int x, int y, const char *msg) {
     LOG_S(DEBUG, __FILE__, __LINE__, "...showmsgXY()");
 }
 
-void LOG_D(level lvl, char *stringFrom, int lineNumber, char *text) {
+void LOG_D(level lvl, const char *stringFrom, int lineNumber, const char *text) {
     if(!_debug && lvl == DEBUG)  
         return;
     char outputBuffer[200] = "\0";
-    char tempBuffer[10] = "\0";
 
     switch(lvl) {
         case DEBUG:
@@ -186,8 +193,12 @@ void LOG_D(level lvl, char *stringFrom, int lineNumber, char *text) {
             strcat(outputBuffer, "[ ] ");
     }
     strcat(outputBuffer, text);
+    (void)stringFrom;
+    (void)lineNumber;
     printText(outputBuffer);
 }
+
+#endif
 
 uint16_t read16(File& f) {
     uint16_t result;         // read little-endian
@@ -351,11 +362,11 @@ void runReel(void) {
     int maxCounter = 0;
 
     File f = root.openNextFile();
-    if(f == NULL)
+    if(!f)
         root.rewindDirectory();
 
     f = root.openNextFile();
-    if(f == NULL) {
+    if(!f) {
         LOG_D(INFO, __FILE__, __LINE__, "No BMP's found(a)");
         LOG_S(DEBUG, __FILE__, __LINE__, "...runReel()");
         return;
@@ -364,9 +375,9 @@ void runReel(void) {
     strcpy(nm, (char *)f.name());
     strlwr(nm);
     LOG_D(INFO, __FILE__, __LINE__, "Looking 4 imgs...");
-    while((strstr(nm, ".bmp") == NULL) || (f == NULL) ) {
+    while((strstr(nm, ".bmp") == NULL) || (!f) ) {
         f = root.openNextFile();
-        if (f == NULL) {
+        if (!f) {
             root.rewindDirectory();
         } else {
             strcpy(nm, (char *)f.name());
@@ -383,7 +394,7 @@ void runReel(void) {
         }
     }
 
-    if(f == NULL) {
+    if(!f) {
         LOG_D(INFO, __FILE__, __LINE__, "No BMP's found(c)");
         LOG_S(DEBUG, __FILE__, __LINE__, "...runReel()");
         return;
