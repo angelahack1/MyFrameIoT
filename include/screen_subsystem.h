@@ -18,29 +18,27 @@
 #define GREEN   0x07E0
 #define WHITE   0xFFFF
 #define GREY    0x8410
-#define NAMEMATCH ""
 #define PALETTEDEPTH 0
-#define BMPIMAGEOFFSET 54
-#define BUFFPIXEL      20
+#define BUFFPIXEL      10
 
 #if defined(ESP32)
-    #define SD_CS   5   //8-R-D-U
-    #define SD_SCK  18  //9-R-D-U
-    #define SD_DI   23  //1-R-U-D
-    #define SD_DO   19  //6-R-U-D
-    #define LCD_RD  2   //4-R-D-U
-    #define LCD_WR  4   //5-R-D-U
-    #define LCD_RS 15   //3-R-D-U
-    #define LCD_CS 33   //7-L-U-D
-    #define LCD_RST 32  //6-L-U-D
-    #define LCD_D0 12   //4-L-D-U
-    #define LCD_D1 13   //3-L-D-U
-    #define LCD_D2 26   //7-L-D-U
-    #define LCD_D3 25   //8-L-D-U
-    #define LCD_D4 17   //7-R-D-U
-    #define LCD_D5 16   //6-R-D-U
-    #define LCD_D6 27   //6-L-D-U
-    #define LCD_D7 14   //5-L-D-U
+    #define SD_CS   5
+    #define SD_SCK  18
+    #define SD_DI   23
+    #define SD_DO   19
+    #define LCD_RD  2
+    #define LCD_WR  4
+    #define LCD_RS 15
+    #define LCD_CS 33
+    #define LCD_RST 32
+    #define LCD_D0 12
+    #define LCD_D1 13
+    #define LCD_D2 26
+    #define LCD_D3 25
+    #define LCD_D4 17
+    #define LCD_D5 16
+    #define LCD_D6 27
+    #define LCD_D7 14
 #else
     #define SD_CS     10
 #endif
@@ -51,71 +49,58 @@
 MCUFRIEND_kbv tft;
 char namebuf[32] = "/reel";
 File root;
-int pathlen;
+uint8_t pathlen;
 
 #if MF_ENABLE_SCREEN_LOG
-int lineCounter = 0;
-int maxLines = MAXLINES;
-char textScreen[MAXLINES+1][30];
+uint8_t lineCounter = 0;
+char textScreen[MAXLINES+1][MAXWIDTH+1];
 bool showPrepared = false;
 #endif
 
 uint16_t read16(File& f);
 uint32_t read32(File& f);
-uint8_t showBMP(char *nm, int x, int y);
+uint8_t showBMP(char *nm, int16_t x, int16_t y);
 #if MF_ENABLE_SCREEN_LOG
-void showPrepare(int sz, const GFXfont *f, uint16_t color);
-void showmsgXYPrepared(int x, int y, const char *msg);
-void showmsgXY(int x, int y, int sz, const GFXfont *f, const char *msg, uint16_t color);
+void showPrepare(uint8_t sz, const GFXfont *f, uint16_t color);
+void showmsgXYPrepared(int16_t x, int16_t y, const char *msg);
+void showmsgXY(int16_t x, int16_t y, uint8_t sz, const GFXfont *f, const char *msg, uint16_t color);
 #endif
 
 void setupSD(void) {
-    LOG_S(DEBUG, __FILE__, __LINE__, "setupSD()...");
-    bool good = SD.begin(SD_CS);
-    if (!good) {
+    LOG_S(DEBUG, __FILE__, __LINE__, "setupSD()");
+    if (!SD.begin(SD_CS)) {
         Serial.print(F("cannot start SD"));
         while (1);
     }
     root = SD.open(namebuf);
     pathlen = strlen(namebuf);
-    LOG_S(DEBUG, __FILE__, __LINE__, "...setupSD()");
 }
 
 void setupScreen(void) {
-    LOG_S(DEBUG, __FILE__, __LINE__, "setupScreen()...");
-    uint16_t ID;
-    char tempBuffer[50];
-    ID = tft.readID();
+    LOG_S(DEBUG, __FILE__, __LINE__, "setupScreen()");
+    uint16_t ID = tft.readID();
     if (ID == 0x0D3D3) ID = 0x9481;
-    sprintf(tempBuffer, "TFT Setup, LCD ID:0x%x", ID);
+    char tempBuffer[30];
+    sprintf(tempBuffer, "LCD ID:0x%x", ID);
     LOG_S(INFO, __FILE__, __LINE__, tempBuffer);
-
     tft.begin(ID);
-    tft.fillScreen(0x0000);
-    tft.setTextColor(0xFFFF, 0x0000);
-    LOG_S(DEBUG, __FILE__, __LINE__, "...setupScreen()");
+    tft.fillScreen(BLACK);
+    tft.setTextColor(WHITE, BLACK);
 }
 
 void cleanScr() {
-    LOG_S(DEBUG, __FILE__, __LINE__, "cleanScr()...");
     tft.fillScreen(BLACK);
-
 #if MF_ENABLE_SCREEN_LOG
     lineCounter = 0;
 #endif
-
-    LOG_S(DEBUG, __FILE__, __LINE__, "...cleanScr()");
 }
 
 #if MF_ENABLE_SCREEN_LOG
 void printText(char *text) {
-    LOG_S(DEBUG, __FILE__, __LINE__, "printText()...");
     char textBuffer[MAXWIDTH+1];
 
     if(strlen(text) > MAXWIDTH) {
-        for(int j = 0; j < MAXWIDTH; j++) {
-            textBuffer[j] = text[j];
-        }
+        memcpy(textBuffer, text, MAXWIDTH);
         textBuffer[MAXWIDTH] = '\0';
     } else {
         strcpy(textBuffer, text);
@@ -126,73 +111,54 @@ void printText(char *text) {
         showPrepared = true;
     }
 
-    if(lineCounter >= maxLines) {
+    if(lineCounter >= MAXLINES) {
         cleanScr();
-        for(int i = 0; i < maxLines - 1; i++) {
+        for(uint8_t i = 0; i < MAXLINES - 1; i++) {
             strcpy(textScreen[i], textScreen[i+1]);
             showmsgXYPrepared(4, (i+1)*MAXHEIGHT, textScreen[i]);
         }
-        lineCounter = maxLines - 1;
+        lineCounter = MAXLINES - 1;
         strcpy(textScreen[lineCounter], textBuffer);
         showmsgXYPrepared(4, (lineCounter+1)*MAXHEIGHT, textScreen[lineCounter]);
-        lineCounter = maxLines;
+        lineCounter = MAXLINES;
     } else {
         strcpy(textScreen[lineCounter], textBuffer);
         showmsgXYPrepared(4, (lineCounter+1)*MAXHEIGHT, textScreen[lineCounter]);
         lineCounter++;
     }
-    LOG_S(DEBUG, __FILE__, __LINE__, "...printText()");
 }
 
-void showmsgXY(int x, int y, int sz, const GFXfont *f, const char *msg, uint16_t color)
+void showmsgXY(int16_t x, int16_t y, uint8_t sz, const GFXfont *f, const char *msg, uint16_t color)
 {
-    LOG_S(DEBUG, __FILE__, __LINE__, "showmsgXY()...");
     tft.setFont(f);
     tft.setCursor(x, y);
     tft.setTextColor(color);
     tft.setTextSize(sz);
     tft.print(msg);
-    LOG_S(DEBUG, __FILE__, __LINE__, "...showmsgXY()");
 }
 
-void showPrepare(int sz, const GFXfont *f, uint16_t color) {
+void showPrepare(uint8_t sz, const GFXfont *f, uint16_t color) {
     tft.setFont(f);
     tft.setTextColor(color);
     tft.setTextSize(sz);
 }
 
-void showmsgXYPrepared(int x, int y, const char *msg) {
-    LOG_S(DEBUG, __FILE__, __LINE__, "showmsgXY()...");
+void showmsgXYPrepared(int16_t x, int16_t y, const char *msg) {
     tft.setCursor(x, y);
     tft.print(msg);
-    LOG_S(DEBUG, __FILE__, __LINE__, "...showmsgXY()");
 }
 
 void LOG_D(level lvl, const char *stringFrom, int lineNumber, const char *text) {
-    if(!_debug && lvl == DEBUG)  
+    if(!_debug && lvl == DEBUG)
         return;
-    char outputBuffer[200] = "\0";
-
-    switch(lvl) {
-        case DEBUG:
-            strcat(outputBuffer, "[D] ");
-        break;
-        case INFO:
-            strcat(outputBuffer, "[I] ");
-        break;
-        case WARN:
-            strcat(outputBuffer, "[W] ");
-        break;
-        case ERROR:
-            strcat(outputBuffer, "[E] ");
-        break;
-        case FATAL:
-            strcat(outputBuffer, "[F] ");
-        break;
-        default:
-            strcat(outputBuffer, "[ ] ");
+    char outputBuffer[40] = "\0";
+    static const char* const prefixes[] = {"[D] ", "[I] ", "[W] ", "[E] ", "[F] "};
+    if(lvl <= FATAL) {
+        strcpy(outputBuffer, prefixes[lvl]);
+    } else {
+        strcpy(outputBuffer, "[ ] ");
     }
-    strcat(outputBuffer, text);
+    strncat(outputBuffer, text, sizeof(outputBuffer) - 5);
     (void)stringFrom;
     (void)lineNumber;
     printText(outputBuffer);
@@ -201,7 +167,7 @@ void LOG_D(level lvl, const char *stringFrom, int lineNumber, const char *text) 
 #endif
 
 uint16_t read16(File& f) {
-    uint16_t result;         // read little-endian
+    uint16_t result;
     f.read((uint8_t*)&result, sizeof(result));
     return result;
 }
@@ -212,110 +178,89 @@ uint32_t read32(File& f) {
     return result;
 }
 
-uint8_t showBMP(char *nm, int x, int y)
+uint8_t showBMP(char *nm, int16_t x, int16_t y)
 {
-    LOG_S(DEBUG, __FILE__, __LINE__, "showBMP()...");
     File bmpFile;
-    int bmpWidth, bmpHeight;    // W+H in pixels
-    uint8_t bmpDepth;           // Bit depth (currently must be 24, 16, 8, 4, 1)
-    uint32_t bmpImageoffset;    // Start of image data in file
-    uint32_t rowSize;           // Not always = bmpWidth; may have padding
-    uint8_t sdbuffer[3 * BUFFPIXEL];    // pixel in buffer (R+G+B per pixel)
-    uint16_t lcdbuffer[(1 << PALETTEDEPTH) + BUFFPIXEL], *palette = NULL;
-    uint8_t bitmask, bitshift;
-    boolean flip = true;        // BMP is stored bottom-to-top
-    int w, h, row, col, lcdbufsiz = (1 << PALETTEDEPTH) + BUFFPIXEL, buffidx;
-    uint32_t pos;               // seek position
+    int16_t bmpWidth, bmpHeight;
+    uint8_t bmpDepth;
+    uint32_t bmpImageoffset;
+    uint32_t rowSize;
+    uint8_t sdbuffer[3 * BUFFPIXEL];
+    uint16_t lcdbuffer[(1 << PALETTEDEPTH) + BUFFPIXEL];
+    boolean flip = true;
+    int16_t w, h, row, col;
+    int16_t lcdbufsiz = (1 << PALETTEDEPTH) + BUFFPIXEL;
+    int16_t buffidx;
+    uint32_t pos;
     boolean is565 = false;
     uint16_t bmpID;
-    uint16_t n;                 // blocks read
+    uint16_t n;
     uint8_t ret;
 
-    if ((x >= tft.width()) || (y >= tft.height())) {
-        LOG_S(DEBUG, __FILE__, __LINE__, "...showBMP()");
-        return 1;               // off screen
-    }
+    if ((x >= tft.width()) || (y >= tft.height()))
+        return 1;
 
-    bmpFile = SD.open(nm);      // Parse BMP header
-    bmpID = read16(bmpFile);    // BMP signature
-    (void) read32(bmpFile);     // Read & ignore file size
-    (void) read32(bmpFile);     // Read & ignore creator bytes
-    bmpImageoffset = read32(bmpFile);       // Start of image data
-    (void) read32(bmpFile);     // Read & ignore DIB header size
+    bmpFile = SD.open(nm);
+    bmpID = read16(bmpFile);
+    (void) read32(bmpFile);
+    (void) read32(bmpFile);
+    bmpImageoffset = read32(bmpFile);
+    (void) read32(bmpFile);
     bmpWidth = read32(bmpFile);
     bmpHeight = read32(bmpFile);
-    n = read16(bmpFile);        // # planes -- must be '1'
-    bmpDepth = read16(bmpFile); // bits per pixel
-    pos = read32(bmpFile);      // format
-    if (bmpID != 0x4D42) ret = 2; // bad ID
-    else if (n != 1) ret = 3;   // too many planes
-    else if (pos != 0 && pos != 3) ret = 4; // format: 0 = uncompressed, 3 = 565
-    else if (bmpDepth < 16 && bmpDepth > PALETTEDEPTH) ret = 5; // palette 
+    n = read16(bmpFile);
+    bmpDepth = read16(bmpFile);
+    pos = read32(bmpFile);
+    if (bmpID != 0x4D42) ret = 2;
+    else if (n != 1) ret = 3;
+    else if (pos != 0 && pos != 3) ret = 4;
+    else if (bmpDepth < 16 && bmpDepth > PALETTEDEPTH) ret = 5;
     else {
         bool first = true;
-        is565 = (pos == 3);               // ?already in 16-bit format
-        // BMP rows are padded (if needed) to 4-byte boundary
+        is565 = (pos == 3);
         rowSize = (bmpWidth * bmpDepth / 8 + 3) & ~3;
-        if (bmpHeight < 0) {              // If negative, image is in top-down order.
+        if (bmpHeight < 0) {
             bmpHeight = -bmpHeight;
             flip = false;
         }
 
         w = bmpWidth;
         h = bmpHeight;
-        if ((x + w) >= tft.width())       // Crop area to be loaded
+        if ((x + w) >= tft.width())
             w = tft.width() - x;
-        if ((y + h) >= tft.height())      //
+        if ((y + h) >= tft.height())
             h = tft.height() - y;
 
-        if (bmpDepth <= PALETTEDEPTH) {   // these modes have separate palette
-            //bmpFile.seek(BMPIMAGEOFFSET); //palette is always @ 54
-            bmpFile.seek(bmpImageoffset - (4<<bmpDepth)); //54 for regular, diff for colorsimportant
-            bitmask = 0xFF;
-            if (bmpDepth < 8)
-                bitmask >>= bmpDepth;
-            bitshift = 8 - bmpDepth;
-            n = 1 << bmpDepth;
-            lcdbufsiz -= n;
-            palette = lcdbuffer + lcdbufsiz;
-            for (col = 0; col < n; col++) {
-                pos = read32(bmpFile);    //map palette to 5-6-5
-                palette[col] = ((pos & 0x0000F8) >> 3) | ((pos & 0x00FC00) >> 5) | ((pos & 0xF80000) >> 8);
-            }
-        }
-
-        // Set TFT address window to clipped image bounds
         tft.setAddrWindow(x, y, x + w - 1, y + h - 1);
-        for (row = 0; row < h; row++) { // For each scanline...
+        for (row = 0; row < h; row++) {
             uint8_t r, g, b, *sdptr;
-            int lcdidx, lcdleft;
-            if (flip)   // Bitmap is stored bottom-to-top order (normal BMP)
+            int16_t lcdidx, lcdleft;
+            if (flip)
                 pos = bmpImageoffset + (bmpHeight - 1 - row) * rowSize;
-            else        // Bitmap is stored top-to-bottom
+            else
                 pos = bmpImageoffset + row * rowSize;
-            if (bmpFile.position() != pos) { // Need seek?
+            if (bmpFile.position() != pos) {
                 bmpFile.seek(pos);
-                buffidx = sizeof(sdbuffer); // Force buffer reload
+                buffidx = sizeof(sdbuffer);
             }
 
-            for (col = 0; col < w; ) {  //pixels in row
+            for (col = 0; col < w; ) {
                 lcdleft = w - col;
                 if (lcdleft > lcdbufsiz) lcdleft = lcdbufsiz;
-                for (lcdidx = 0; lcdidx < lcdleft; lcdidx++) { // buffer at a time
+                for (lcdidx = 0; lcdidx < lcdleft; lcdidx++) {
                     uint16_t color;
-                    // Time to read more pixel data?
-                    if (buffidx >= sizeof(sdbuffer)) { // Indeed
+                    if (buffidx >= sizeof(sdbuffer)) {
                         bmpFile.read(sdbuffer, sizeof(sdbuffer));
-                        buffidx = 0; // Set index to beginning
+                        buffidx = 0;
                         r = 0;
                     }
-                    switch (bmpDepth) {          // Convert pixel from BMP to TFT format
+                    switch (bmpDepth) {
                         case 32:
                         case 24:
                             b = sdbuffer[buffidx++];
                             g = sdbuffer[buffidx++];
                             r = sdbuffer[buffidx++];
-                            if (bmpDepth == 32) buffidx++; //ignore ALPHA
+                            if (bmpDepth == 32) buffidx++;
                             color = tft.color565(r, g, b);
                             break;
                         case 16:
@@ -326,40 +271,27 @@ uint8_t showBMP(char *nm, int x, int y)
                             else
                                 color = (r << 9) | ((b & 0xE0) << 1) | (b & 0x1F);
                             break;
-                        case 1:
-                        case 4:
-                        case 8:
-                            if (r == 0)
-                                b = sdbuffer[buffidx++], r = 8;
-                            color = palette[(b >> bitshift) & bitmask];
-                            r -= bmpDepth;
-                            b <<= bmpDepth;
-                            break;
                     }
                     lcdbuffer[lcdidx] = color;
-
                 }
                 tft.pushColors(lcdbuffer, lcdidx, first);
                 first = false;
                 col += lcdidx;
-            }           // end cols
-        }               // end rows
-        tft.setAddrWindow(0, 0, tft.width() - 1, tft.height() - 1); //restore full screen
-        ret = 0;        // good render
+            }
+        }
+        tft.setAddrWindow(0, 0, tft.width() - 1, tft.height() - 1);
+        ret = 0;
     }
     bmpFile.close();
-    LOG_S(DEBUG, __FILE__, __LINE__, "...showBMP()");
-    return (ret);
+    return ret;
 }
 
 void runReel(void) {
-    LOG_S(DEBUG, __FILE__, __LINE__, "runReel()...");
     uint8_t ret;
     uint32_t start;
     char *nm = namebuf + pathlen;
-    *nm = '/';
-    nm++;
-    int maxCounter = 0;
+    *nm++ = '/';
+    uint16_t maxCounter = 0;
 
     File f = root.openNextFile();
     if(!f)
@@ -367,14 +299,13 @@ void runReel(void) {
 
     f = root.openNextFile();
     if(!f) {
-        LOG_D(INFO, __FILE__, __LINE__, "No BMP's found(a)");
-        LOG_S(DEBUG, __FILE__, __LINE__, "...runReel()");
+        LOG_D(INFO, __FILE__, __LINE__, "No BMPs(a)");
         return;
     }
 
     strcpy(nm, (char *)f.name());
     strlwr(nm);
-    LOG_D(INFO, __FILE__, __LINE__, "Looking 4 imgs...");
+    LOG_D(INFO, __FILE__, __LINE__, "Srch imgs...");
     while((strstr(nm, ".bmp") == NULL) || (!f) ) {
         f = root.openNextFile();
         if (!f) {
@@ -386,8 +317,7 @@ void runReel(void) {
         }
 
         if (maxCounter >= 1024) {
-            LOG_D(INFO, __FILE__, __LINE__, "No BMP's found(b)");
-            LOG_S(DEBUG, __FILE__, __LINE__, "...runReel()");
+            LOG_D(INFO, __FILE__, __LINE__, "No BMPs(b)");
             return;
         } else {
             maxCounter++;
@@ -395,8 +325,7 @@ void runReel(void) {
     }
 
     if(!f) {
-        LOG_D(INFO, __FILE__, __LINE__, "No BMP's found(c)");
-        LOG_S(DEBUG, __FILE__, __LINE__, "...runReel()");
+        LOG_D(INFO, __FILE__, __LINE__, "No BMPs(c)");
         return;
     }
 
@@ -404,40 +333,28 @@ void runReel(void) {
     tft.fillScreen(0);
     start = millis();
     cleanScr();
-    LOG_D(INFO, __FILE__, __LINE__, "A rendenderizar: ");
+    LOG_D(INFO, __FILE__, __LINE__, "Rendering:");
     LOG_D(INFO, __FILE__, __LINE__, namebuf);
     delay(1000);
     cleanScr();
     ret = showBMP(namebuf, 5, 5);
     delay(3000);
     switch (ret) {
-        case 0:
-            char stringBuffer[50];
+        case 0: {
+            char buf[30];
             cleanScr();
-            sprintf(stringBuffer, "Render on %dms", (int) (millis() - start));
-            LOG_D(INFO, __FILE__, __LINE__, stringBuffer);
+            sprintf(buf, "Done %dms", (int)(millis() - start));
+            LOG_D(INFO, __FILE__, __LINE__, buf);
             delay(1000);
             break;
-        case 1:
-            LOG_D(INFO, __FILE__, __LINE__, "bad position");
-            break;
-        case 2:
-            LOG_D(INFO, __FILE__, __LINE__, "bad BMP ID");
-            break;
-        case 3:
-            LOG_D(INFO, __FILE__, __LINE__, "wrong # planes");
-            break;
-        case 4:
-            LOG_D(INFO, __FILE__, __LINE__, "unsupported fmt");
-            break;
-        case 5:
-            LOG_D(INFO, __FILE__, __LINE__, "unsupported pltt");
-            break;
-        default:
-            LOG_D(INFO, __FILE__, __LINE__, "unknown");
-            break;
+        }
+        case 1: LOG_D(INFO, __FILE__, __LINE__, "bad pos"); break;
+        case 2: LOG_D(INFO, __FILE__, __LINE__, "bad ID"); break;
+        case 3: LOG_D(INFO, __FILE__, __LINE__, "bad planes"); break;
+        case 4: LOG_D(INFO, __FILE__, __LINE__, "bad fmt"); break;
+        case 5: LOG_D(INFO, __FILE__, __LINE__, "bad pltt"); break;
+        default: LOG_D(INFO, __FILE__, __LINE__, "unknown"); break;
     }
-    LOG_S(DEBUG, __FILE__, __LINE__, "...runReel()");
 }
 
 #endif
